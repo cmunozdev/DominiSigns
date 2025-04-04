@@ -44,7 +44,7 @@ Currently in active development phase. The project is at the following stages:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/dominisigns.git
+git clone https://github.com/cmunozdev/dominisigns.git
 cd dominisigns
 
 # Install dependencies

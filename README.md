@@ -1,90 +1,115 @@
-# DominiSigns: Traductor de Avatar para Lenguaje de Señas Dominicano
-## 📝 Descripción del Proyecto
+# DominiSigns: Avatar Translator for Dominican Sign Language
 
-DominiSigns es una innovadora aplicación de accesibilidad que utiliza inteligencia artificial para traducir texto y voz al lenguaje de señas dominicano (LSRD) a través de un avatar 3D animado. Nuestro objetivo es derribar barreras de comunicación y promover la inclusión de la comunidad sorda en República Dominicana.
+![DominiSigns Logo](https://via.placeholder.com/200x200.png?text=DominiSigns)
 
-## 🌟 Características Principales
+## 📝 Project Description
 
-- **Traducción de Texto a Señas**: Convierte entradas de texto a animaciones de lenguaje de señas dominicano
-- **Traducción de Voz a Señas**: Reconoce audio y lo convierte a señas
-- **Avatar 3D Personalizado**: Avatar realista que realiza señas con precisión y fluidez
-- **Diccionario Integrado**: Base de datos completa de LSRD
-- **Interfaz Accesible**: Diseñada siguiendo principios de accesibilidad universal
+DominiSigns is an innovative accessibility application that uses artificial intelligence to translate text and voice into Dominican sign language (LSRD) through an animated 3D avatar. Our goal is to break down communication barriers and promote the inclusion of the deaf community in the Dominican Republic.
 
-## 🚀 Estado del Proyecto
+## 🌟 Key Features
 
-Actualmente en fase de desarrollo activo. El proyecto se encuentra en las siguientes etapas:
+- **Text-to-Sign Translation**: Converts text input into Dominican sign language animations
+- **Speech-to-Sign Translation**: Recognizes audio and converts it to signs
+- **Customized 3D Avatar**: Realistic avatar that performs signs with precision and fluidity
+- **Integrated Dictionary**: Comprehensive LSRD database
+- **Accessible Interface**: Designed following universal accessibility principles
 
-- [x] Recopilación de diccionario y videos de referencia de LSRD
-- [ ] Desarrollo del procesador de texto/voz
-- [ ] Creación del avatar 3D base
-- [ ] Implementación de las animaciones de señas
-- [ ] Desarrollo de la interfaz de usuario
-- [ ] Pruebas con la comunidad sorda dominicana
+## 🚀 Project Status
 
-## 🛠️ Tecnologías Utilizadas
+Currently in active development phase. The project is at the following stages:
+
+- [x] Collection of LSRD dictionary and reference videos
+- [ ] Development of text/voice processor
+- [ ] Creation of base 3D avatar
+- [ ] Implementation of sign animations
+- [ ] Development of user interface
+- [ ] Testing with the Dominican deaf community
+
+## 🛠️ Technologies Used
 
 - **Frontend**: React, Three.js
 - **Backend**: Node.js, Express
-- **Procesamiento de Lenguaje**: TensorFlow/PyTorch para NLP
-- **Animación 3D**: Blender, Mixamo
-- **IA Generativa**: Pollinations.ai API
-- **Base de Datos**: MongoDB
+- **Language Processing**: TensorFlow/PyTorch for NLP
+- **3D Animation**: Blender, Mixamo
+- **Generative AI**: Pollinations.ai API
+- **Database**: MongoDB
 
-## 📋 Requisitos
+## 📋 Requirements
 
-- Node.js v14 o superior
-- Acceso a API de Pollinations.ai
-- Dependencias listadas en package.json
+- Node.js v14 or higher
+- Access to Pollinations.ai API
+- Dependencies listed in package.json
 
-## 📊 Arquitectura del Sistema
+## 🔧 Installation and Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/dominisigns.git
+cd dominisigns
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env
+# Edit the .env file with your API credentials
+
+# Start the development server
+npm run dev
+```
+
+## 📊 System Architecture
 
 ```
                       ┌───────────────┐
-                      │  Entrada de   │
-                      │ Texto/Audio   │
+                      │  Text/Audio   │
+                      │    Input      │
                       └───────┬───────┘
                               │
                       ┌───────▼───────┐
-                      │  Procesador   │
                       │     NLP       │
+                      │   Processor   │
                       └───────┬───────┘
                               │
         ┌───────────┬─────────▼────────┬───────────┐
         │           │                  │           │
 ┌───────▼───┐ ┌─────▼─────┐    ┌───────▼───┐ ┌─────▼─────┐
-│ Análisis  │ │ Traducción│    │ Generación │ │ Secuencia │
-│ Sintáctico│ │   LSRD    │    │ Animaciones│ │  de Señas │
+│  Syntactic │ │   LSRD    │    │ Animation  │ │   Sign    │
+│  Analysis  │ │Translation│    │ Generation │ │ Sequencing│
 └───────┬───┘ └─────┬─────┘    └───────┬───┘ └─────┬─────┘
         │           │                  │           │
         └───────────┴─────────┬────────┴───────────┘
                               │
                       ┌───────▼───────┐
+                      │      3D       │
                       │    Avatar     │
-                      │     3D        │
                       └───────────────┘
 ```
 
-## 🔍 Casos de Uso
+## 🔍 Use Cases
 
-- **Educación**: Apoyo en aulas inclusivas
-- **Servicios Públicos**: Mejora de accesibilidad en hospitales, bancos, etc.
-- **Comunicación Personal**: Facilita interacciones cotidianas
-- **Eventos y Conferencias**: Interpretación automática para presentaciones
+- **Education**: Support in inclusive classrooms
+- **Public Services**: Improved accessibility in hospitals, banks, etc.
+- **Personal Communication**: Facilitates everyday interactions
+- **Events and Conferences**: Automatic interpretation for presentations
 
-## 🌍 Impacto Social
+## 🌍 Social Impact
 
-Este proyecto está dirigido a las aproximadamente 100,000 personas sordas en República Dominicana que utilizan LSRD como su principal medio de comunicación. Al facilitar una herramienta tecnológica que respeta las particularidades culturales y lingüísticas del país, buscamos:
+This project is aimed at approximately 100,000 deaf people in the Dominican Republic who use LSRD as their primary means of communication. By providing a technological tool that respects the cultural and linguistic particularities of the country, we seek to:
 
-1. Reducir barreras de comunicación
-2. Promover la inclusión social
-3. Preservar y difundir el lenguaje de señas dominicano
-4. Apoyar la independencia y autonomía de la comunidad sorda
+1. Reduce communication barriers
+2. Promote social inclusion
+3. Preserve and spread Dominican sign language
+4. Support independence and autonomy of the deaf community
 
 
-## 🙏 Agradecimientos
+## 📜 License
 
-- [Asociación Nacional de Sordos de República Dominicana](https://ansordo.org)
-- Comunidad de desarrolladores de accesibilidad
-- Equipo de Pollinations.ai por su apoyo técnico
-- Todos los intérpretes y colaboradores que han contribuido con material de referencia
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgements
+
+- [National Association of the Deaf of the Dominican Republic](https://ansordo.org)
+- Accessibility developer community
+- Pollinations.ai team for their technical support
+- All interpreters and collaborators who have contributed reference material

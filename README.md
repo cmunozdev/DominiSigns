@@ -1,7 +1,5 @@
 # DominiSigns: Avatar Translator for Dominican Sign Language
 
-![DominiSigns Logo](https://via.placeholder.com/200x200.png?text=DominiSigns)
-
 ## 📝 Project Description
 
 DominiSigns is an innovative accessibility application that uses artificial intelligence to translate text and voice into Dominican sign language (LSRD) through an animated 3D avatar. Our goal is to break down communication barriers and promote the inclusion of the deaf community in the Dominican Republic.

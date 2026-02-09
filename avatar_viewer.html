@@ -49,9 +49,9 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-                "kalidokit": "https://cdn.jsdelivr.net/npm/kalidokit@1.1.5/dist/kalidokit.es.js"
+                "three": "./libs/three.module.js?v=2",
+                "three/addons/": "./libs/",
+                "kalidokit": "./libs/kalidokit.es.js?v=2"
             }
         }
     </script>
@@ -70,12 +70,53 @@
         <br>
         <input type="file" id="fileInput" accept=".json">
     </div>
+    <div id="error-log"
+        style="position: absolute; top: 0; right: 0; background: rgba(255,0,0,0.8); color: white; padding: 10px; display: none; max-width: 300px;">
+    </div>
+
+    <script>
+        // Override console.log and error to show on screen
+        const logDiv = document.getElementById('error-log');
+
+        function showLog(msg, color = 'white') {
+            logDiv.style.display = 'block';
+            logDiv.innerHTML += `<div style="color:${color}; border-bottom:1px solid #444; margin-bottom:2px;">${msg}</div>`;
+        }
+
+        const originalLog = console.log;
+        console.log = function (...args) {
+            originalLog.apply(console, args);
+            showLog("LOG: " + args.join(' '));
+        };
+
+        const originalError = console.error;
+        console.error = function (...args) {
+            originalError.apply(console, args);
+            showLog("ERR: " + args.join(' '), 'red');
+        };
+
+        window.onerror = function (msg, url, line, col, error) {
+            showLog(`CRASH: ${msg} <br> Line: ${line}`, 'red');
+            return false;
+        };
+
+        showLog("System starting...");
+    </script>
 
     <script type="module">
+        showLog("Module script started");
+
         import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        showLog("Three.js imported");
+
+        import { OrbitControls } from 'three/addons/OrbitControls.js';
+        showLog("OrbitControls imported");
+
+        import { GLTFLoader } from 'three/addons/GLTFLoader.js';
+        showLog("GLTFLoader imported");
+
         import * as Kalidokit from 'kalidokit';
+        showLog("Kalidokit imported");
 
         let scene, camera, renderer, clock;
         let avatarModel, currentVrm;
@@ -86,8 +127,8 @@
         let lastTime = 0;
         let fps = 30;
 
-        // Default Ready Player Me avatar
-        const AVATAR_URL = 'https://models.readyplayer.me/64b73e536104245d8122c54c.glb';
+        // Public avatar model (Three.js Soldier example with Mixamo rig)
+        const AVATAR_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
 
         function init() {
             clock = new THREE.Clock();
@@ -301,6 +342,11 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
+
+        // Start the application
+        showLog("Calling init()...");
+        init();
+        showLog("Init complete, avatar loading...");
     </script>
 </body>
 

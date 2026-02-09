@@ -2,6 +2,7 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <title>DominiSigns - Avatar Animation Prototype</title>
     <style>
         body {
@@ -64,14 +65,48 @@
     </div>
     <div id="loading">Loading Avatar...</div>
     <div id="controls">
-        <button id="playBtn">Play</button>
+        <button id="playBtn">Play JSON</button>
         <button id="pauseBtn">Pause</button>
-        <span id="frameDisplay">Frame: 0</span>
+        <span id="frameDisplay">Ready</span>
         <br>
         <input type="file" id="fileInput" accept=".json">
     </div>
+
+    <div id="testControls"
+        style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; max-width: 200px;">
+        <h4 style="margin: 0 0 10px 0;">🧪 Test Bones</h4>
+        <button onclick="resetPose()"
+            style="width:100%; margin-bottom:8px; padding:8px; background:#444; color:white; border:none; border-radius:4px; cursor:pointer;">🔄
+            Reset Pose (Arms Down)</button>
+        <hr style="border-color:#555; margin:8px 0;">
+        <button onclick="testRightArm()"
+            style="width:100%; margin-bottom:5px; padding:6px; background:#2a5a9e; color:white; border:none; border-radius:4px; cursor:pointer;">➡️
+            Right Arm</button>
+        <button onclick="testLeftArm()"
+            style="width:100%; margin-bottom:5px; padding:6px; background:#2a5a9e; color:white; border:none; border-radius:4px; cursor:pointer;">⬅️
+            Left Arm</button>
+        <button onclick="testRightHand()"
+            style="width:100%; margin-bottom:5px; padding:6px; background:#5a9e2a; color:white; border:none; border-radius:4px; cursor:pointer;">✋
+            Right Hand</button>
+        <button onclick="testLeftHand()"
+            style="width:100%; margin-bottom:5px; padding:6px; background:#5a9e2a; color:white; border:none; border-radius:4px; cursor:pointer;">🤚
+            Left Hand</button>
+        <button onclick="testFingers()"
+            style="width:100%; margin-bottom:5px; padding:6px; background:#9e5a2a; color:white; border:none; border-radius:4px; cursor:pointer;">🖐️
+            All Fingers</button>
+        <button onclick="testHead()"
+            style="width:100%; margin-bottom:5px; padding:6px; background:#9e2a5a; color:white; border:none; border-radius:4px; cursor:pointer;">🗣️
+            Head</button>
+        <hr style="border-color:#555; margin:8px 0;">
+        <button onclick="startAutoTest()"
+            style="width:100%; padding:8px; background:#2a9e5a; color:white; border:none; border-radius:4px; cursor:pointer;">▶️
+            Auto Test All</button>
+        <button onclick="stopAutoTest()"
+            style="width:100%; margin-top:5px; padding:8px; background:#9e2a2a; color:white; border:none; border-radius:4px; cursor:pointer;">⏹️
+            Stop</button>
+    </div>
     <div id="error-log"
-        style="position: absolute; top: 0; right: 0; background: rgba(255,0,0,0.8); color: white; padding: 10px; display: none; max-width: 300px;">
+        style="position: absolute; top: 120px; left: 10px; background: rgba(0,0,0,0.7); color: #0f0; padding: 10px; display: none; max-width: 350px; max-height: 300px; overflow-y: auto; font-size: 11px; border-radius: 5px;">
     </div>
 
     <script>
@@ -127,8 +162,10 @@
         let lastTime = 0;
         let fps = 30;
 
-        // Public avatar model (Three.js Soldier example with Mixamo rig)
-        const AVATAR_URL = 'https://threejs.org/examples/models/gltf/Soldier.glb';
+        // Michelle character from Three.js examples - female with Mixamo rig and detailed hands
+        // Better for sign language demonstration than the Soldier
+        // Using standard ReadyPlayerMe avatar for better compatibility with Kalidokit
+        const AVATAR_URL = './libs/avatars/mixamo/Michelle.glb';
 
         function init() {
             clock = new THREE.Clock();
@@ -183,20 +220,133 @@
             const loader = new GLTFLoader();
             loader.load(AVATAR_URL, (gltf) => {
                 avatarModel = gltf.scene;
+
                 avatarModel.traverse((o) => {
                     if (o.isMesh) {
                         o.castShadow = true;
                         o.receiveShadow = true;
                     }
+                    if (o.isBone) {
+                        // console.log("Bone found:", o.name);
+                    }
                 });
+
+                // Setup animation mixer for embedded GLB animations (Hello sign)
+                if (gltf.animations && gltf.animations.length > 0) {
+                    mixer = new THREE.AnimationMixer(avatarModel);
+                    const action = mixer.clipAction(gltf.animations[0]);
+                    action.play();
+                    showLog(`Playing embedded animation: ${gltf.animations[0].name}`);
+                } else {
+                    showLog("No embedded animations found");
+                }
+
                 scene.add(avatarModel);
                 document.getElementById('loading').style.display = 'none';
-                console.log("Avatar loaded");
+
+                // Print skeleton structure
+                const bones = [];
+                avatarModel.traverse((o) => { if (o.isBone) bones.push(o.name); });
+                showLog("Avatar loaded - " + bones.length + " bones found");
+                console.log("Bone names:", bones);
+
             }, undefined, (e) => {
                 console.error(e);
                 document.getElementById('loading').textContent = "Error loading avatar";
             });
         }
+
+        // Convert MediaPipe landmarks to avatar bone rotations using Kalidokit
+        function applyPose(frameData) {
+            if (!avatarModel || !frameData) return;
+
+            // Stop any embedded animation when applying JSON poses
+            if (mixer) mixer.stopAllAction();
+
+            const pose = frameData.pose;
+            const leftHand = frameData.left_hand;
+            const rightHand = frameData.right_hand;
+
+            if (!pose || pose.length < 23) return;
+
+            try {
+                // Use Kalidokit to solve pose rotations
+                // Only apply ARM rotations - skip Hips/Spine to prevent avatar from lying down
+                const poseRig = Kalidokit.Pose.solve(pose, pose, {
+                    runtime: 'mediapipe',
+                    enableLegs: false
+                });
+
+                if (poseRig) {
+                    // Only arms - DO NOT apply Hips or Spine (causes avatar to lie down)
+                    // Mixamo naming: mixamorigRightArm (not RightUpperArm)
+                    rigBone('mixamorigRightArm', poseRig.RightUpperArm);
+                    rigBone('mixamorigRightForeArm', poseRig.RightLowerArm);
+                    rigBone('mixamorigRightHand', poseRig.RightHand);
+
+                    rigBone('mixamorigLeftArm', poseRig.LeftUpperArm);
+                    rigBone('mixamorigLeftForeArm', poseRig.LeftLowerArm);
+                    rigBone('mixamorigLeftHand', poseRig.LeftHand);
+                }
+            } catch (e) {
+                console.error("Kalidokit error:", e);
+            }
+
+            // Apply hand finger rotations
+            if (rightHand && rightHand.length >= 21) {
+                const rightHandRig = Kalidokit.Hand.solve(rightHand, 'Right');
+                if (rightHandRig) applyHandRig(rightHandRig, 'Right');
+            }
+
+            if (leftHand && leftHand.length >= 21) {
+                const leftHandRig = Kalidokit.Hand.solve(leftHand, 'Left');
+                if (leftHandRig) applyHandRig(leftHandRig, 'Left');
+            }
+        }
+
+        // Helper to apply rotation to a bone
+        function rigBone(boneName, rotation) {
+            if (!rotation) return;
+            const bone = avatarModel.getObjectByName(boneName);
+            if (bone) {
+                // Kalidokit outputs Euler angles in XYZ order
+                // Some adjustments might be needed depending on the rig
+                bone.rotation.set(rotation.x, rotation.y, rotation.z);
+            }
+        }
+
+        // Apply Kalidokit hand rig to avatar fingers
+        function applyHandRig(handRig, side) {
+            const fingerMap = [
+                { name: 'Thumb', bones: ['Thumb1', 'Thumb2', 'Thumb3'] },
+                { name: 'Index', bones: ['Index1', 'Index2', 'Index3'] },
+                { name: 'Middle', bones: ['Middle1', 'Middle2', 'Middle3'] },
+                { name: 'Ring', bones: ['Ring1', 'Ring2', 'Ring3'] },
+                { name: 'Little', bones: ['Pinky1', 'Pinky2', 'Pinky3'] } // Kalidokit uses 'Little', Mixamo uses 'Pinky'
+            ];
+
+            fingerMap.forEach(finger => {
+                const fingerData = handRig[finger.name];
+                if (!fingerData) return;
+
+                // Rotation for the whole finger (Kalidokit gives one overall curl rotation usually)
+                // But we can apply it to the first bone primarily
+
+                // Simple version: apply rotation to first bone, and partial to others
+                if (fingerData.rotation) {
+                    for (let i = 0; i < 3; i++) {
+                        const boneName = `mixamorig${side}Hand${finger.bones[i]}`;
+                        const bone = avatarModel.getObjectByName(boneName);
+                        if (bone) {
+                            // Basic finger curling
+                            bone.rotation.set(fingerData.rotation.x, fingerData.rotation.y, fingerData.rotation.z);
+                        }
+                    }
+                }
+            });
+        }
+
+
 
         function handleFileSelect(evt) {
             handleFile(evt.target.files[0]);
@@ -207,6 +357,10 @@
             reader.onload = (e) => {
                 try {
                     animationData = JSON.parse(e.target.result);
+
+                    // Stop any embedded animation
+                    if (mixer) mixer.stopAllAction();
+
                     fps = animationData.fps || 30;
                     currentFrame = 0;
                     isPlaying = true;
@@ -223,7 +377,10 @@
 
             const delta = clock.getDelta();
 
+            if (mixer) mixer.update(delta);
+
             if (isPlaying && animationData && avatarModel) {
+                // JSON pose playback mode
                 const interval = 1000 / fps;
                 if (time - lastTime > interval) {
                     currentFrame = (currentFrame + 1) % animationData.frames.length;
@@ -231,109 +388,346 @@
                     applyPose(animationData.frames[currentFrame]);
                     lastTime = time;
                 }
+            } else if (avatarModel && autoTestRunning) {
+                // Auto test mode - run automatically
+                runTestAnimation(time);
+            } else if (avatarModel && currentTest) {
+                // Individual test mode
+                runIndividualTest(time);
             }
 
             renderer.render(scene, camera);
         }
 
-        function applyPose(frame) {
-            if (!frame || !avatarModel) return;
+        // Test animation to verify all bones work
+        let testPhase = 0;
+        function runTestAnimation(time) {
+            const t = time * 0.001; // Convert to seconds
+            const cycle = Math.sin(t * 2); // Oscillate between -1 and 1
 
-            // MediaPipe Holistic result format expected by Kalidokit
-            // We need to reconstruct the "results" object structure
-            // Kalidokit expects normalized landmarks
+            // Update test phase display
+            const phases = ['Arm Wave', 'Finger Curl', 'Hand Rotation', 'All Together'];
+            const phaseIndex = Math.floor((t / 3) % 4);
+            document.getElementById('frameDisplay').innerText = `Test: ${phases[phaseIndex]}`;
 
-            // Basic mapping logic (Kalidokit.Event.solve or manual bone rotation)
-            // Note: Kalidokit expects the full result object usually. 
-            // Since we stored arrays, we map back to MP format.
+            // RIGHT ARM - wave motion
+            const rightArm = avatarModel.getObjectByName('mixamorigRightArm');
+            const rightForeArm = avatarModel.getObjectByName('mixamorigRightForeArm');
+            const rightHand = avatarModel.getObjectByName('mixamorigRightHand');
 
-            const pose3D = frame.poseKeypoints3D || frame.pose; // handle our json format
-            const face = frame.face;
-            const leftHand = frame.left_hand;
-            const rightHand = frame.right_hand;
+            if (rightArm) {
+                // Raise arm up (negative Z rotates upward for right arm)
+                rightArm.rotation.z = -0.5 + cycle * 0.3; // Wave between -0.8 and -0.2
+                rightArm.rotation.x = cycle * 0.2; // Slight forward/back
+            }
 
-            // We need to convert our stored array of {x,y,z,visibility} back to what Kalidokit expects
-            // Kalidokit expects: poseLandmarks, faceLandmarks, leftHandLandmarks, rightHandLandmarks
+            if (rightForeArm) {
+                // Bend elbow
+                rightForeArm.rotation.z = -0.3 + Math.abs(cycle) * 0.3;
+            }
 
-            // Helper to format
-            const formatLM = (arr) => arr ? arr.map(l => ({ x: l.x, y: l.y, z: l.z, visibility: l.visibility ?? 1 })) : undefined;
+            if (rightHand) {
+                // Rotate wrist
+                rightHand.rotation.z = cycle * 0.3;
+                rightHand.rotation.x = Math.sin(t * 3) * 0.2;
+            }
 
-            const solved = Kalidokit.Pose.solve(formatLM(pose3D), formatLM(pose3D), {
-                runtime: 'mediapipe',
-                video: null,
-                imageSize: { width: 640, height: 480 } // arbitrary, used for aspect ratio
+            // RIGHT HAND FINGERS - curl/uncurl
+            const fingerBones = [
+                'mixamorigRightHandThumb1', 'mixamorigRightHandThumb2',
+                'mixamorigRightHandIndex1', 'mixamorigRightHandIndex2', 'mixamorigRightHandIndex3',
+                'mixamorigRightHandMiddle1', 'mixamorigRightHandMiddle2', 'mixamorigRightHandMiddle3',
+                'mixamorigRightHandRing1', 'mixamorigRightHandRing2', 'mixamorigRightHandRing3',
+                'mixamorigRightHandPinky1', 'mixamorigRightHandPinky2'
+            ];
+
+            fingerBones.forEach((boneName, i) => {
+                const bone = avatarModel.getObjectByName(boneName);
+                if (bone) {
+                    // Curl fingers with slight offset per finger
+                    const offset = i * 0.2;
+                    const curl = (Math.sin(t * 2 + offset) + 1) * 0.4; // 0 to 0.8 radians
+
+                    if (boneName.includes('Thumb')) {
+                        bone.rotation.z = curl * 0.5; // Thumb moves differently
+                    } else {
+                        bone.rotation.z = curl; // Other fingers curl around Z
+                    }
+                }
             });
 
-            const solvedRightHand = Kalidokit.Hand.solve(formatLM(rightHand), "Right");
-            const solvedLeftHand = Kalidokit.Hand.solve(formatLM(leftHand), "Left");
+            // LEFT ARM - mirror motion
+            const leftArm = avatarModel.getObjectByName('mixamorigLeftArm');
+            const leftForeArm = avatarModel.getObjectByName('mixamorigLeftForeArm');
 
-            // Apply to bones
-            // This requires finding the bones in the GLTF scene.
-            // Ready Player Me uses standard mixamo/humanoid naming mostly.
-
-            if (solved) {
-                // Hips, Spine, Shoulders, etc.
-                rigRotation("Hips", solved.Hips);
-                rigRotation("Spine", solved.Spine);
-                rigRotation("Spine1", solved.Spine1);
-                rigRotation("Spine2", solved.Spine2);
-                rigRotation("Neck", solved.Neck);
-                rigRotation("Head", solved.Head);
-
-                rigRotation("RightArm", solved.RightUpperArm);
-                rigRotation("RightForeArm", solved.RightLowerArm);
-                rigRotation("LeftArm", solved.LeftUpperArm);
-                rigRotation("LeftForeArm", solved.LeftLowerArm);
-
-                // Legs
-                rigRotation("RightUpLeg", solved.RightUpperLeg);
-                rigRotation("RightLeg", solved.RightLowerLeg);
-                rigRotation("LeftUpLeg", solved.LeftUpperLeg);
-                rigRotation("LeftLeg", solved.LeftLowerLeg);
+            if (leftArm) {
+                leftArm.rotation.z = 0.5 - cycle * 0.3; // Mirror of right
             }
 
-            if (solvedRightHand) {
-                rigRotation("RightHand", solvedRightHand.RightWrist);
-                // Fingers... this is where it gets tedious without a helper class
-                // For this prototype, let's just do wrist rotation
+            if (leftForeArm) {
+                leftForeArm.rotation.z = 0.3 - Math.abs(cycle) * 0.3;
             }
-            if (solvedLeftHand) {
-                rigRotation("LeftHand", solvedLeftHand.LeftWrist);
+
+            // HEAD - look around
+            const head = avatarModel.getObjectByName('mixamorigHead');
+            if (head) {
+                head.rotation.y = Math.sin(t) * 0.3; // Look left/right
+                head.rotation.x = Math.sin(t * 0.5) * 0.1; // Slight nod
+            }
+        }
+
+        // ============== TEST CONTROL FUNCTIONS ==============
+        let autoTestRunning = false;
+        let currentTest = null;
+        let testStartTime = 0;
+
+        // Reset to neutral pose (arms down, facing front)
+        function resetPose() {
+            if (!avatarModel) return;
+
+            // Stop any playing animation
+            if (mixer) mixer.stopAllAction();
+
+            autoTestRunning = false;
+            currentTest = null;
+
+            // All bones that need resetting
+            const bonesToReset = [
+                'mixamorigRightArm', 'mixamorigRightForeArm', 'mixamorigRightHand',
+                'mixamorigLeftArm', 'mixamorigLeftForeArm', 'mixamorigLeftHand',
+                'mixamorigHead', 'mixamorigNeck', 'mixamorigSpine', 'mixamorigSpine1', 'mixamorigSpine2',
+                // Right fingers
+                'mixamorigRightHandThumb1', 'mixamorigRightHandThumb2',
+                'mixamorigRightHandIndex1', 'mixamorigRightHandIndex2', 'mixamorigRightHandIndex3',
+                'mixamorigRightHandMiddle1', 'mixamorigRightHandMiddle2', 'mixamorigRightHandMiddle3',
+                'mixamorigRightHandRing1', 'mixamorigRightHandRing2', 'mixamorigRightHandRing3',
+                'mixamorigRightHandPinky1', 'mixamorigRightHandPinky2',
+                // Left fingers
+                'mixamorigLeftHandThumb1', 'mixamorigLeftHandThumb2',
+                'mixamorigLeftHandIndex1', 'mixamorigLeftHandIndex2', 'mixamorigLeftHandIndex3',
+                'mixamorigLeftHandMiddle1', 'mixamorigLeftHandMiddle2', 'mixamorigLeftHandMiddle3',
+                'mixamorigLeftHandRing1', 'mixamorigLeftHandRing2', 'mixamorigLeftHandRing3',
+                'mixamorigLeftHandPinky1', 'mixamorigLeftHandPinky2'
+            ];
+
+            bonesToReset.forEach(name => {
+                const bone = avatarModel.getObjectByName(name);
+                if (bone) {
+                    bone.rotation.set(0, 0, 0);
+                }
+            });
+
+            // Set arms to natural down position (slightly away from body)
+            const rightArm = avatarModel.getObjectByName('mixamorigRightArm');
+            const leftArm = avatarModel.getObjectByName('mixamorigLeftArm');
+            if (rightArm) rightArm.rotation.z = 1.2; // Arms down
+            if (leftArm) leftArm.rotation.z = -1.2;
+
+            document.getElementById('frameDisplay').innerText = 'Pose: Neutral (Arms Down)';
+        }
+
+        // Individual test functions
+        function testRightArm() {
+            resetPose();
+            currentTest = 'rightArm';
+            testStartTime = performance.now();
+            document.getElementById('frameDisplay').innerText = 'Testing: Right Arm';
+        }
+
+        function testLeftArm() {
+            resetPose();
+            currentTest = 'leftArm';
+            testStartTime = performance.now();
+            document.getElementById('frameDisplay').innerText = 'Testing: Left Arm';
+        }
+
+        function testRightHand() {
+            resetPose();
+            currentTest = 'rightHand';
+            testStartTime = performance.now();
+            document.getElementById('frameDisplay').innerText = 'Testing: Right Hand';
+        }
+
+        function testLeftHand() {
+            resetPose();
+            currentTest = 'leftHand';
+            testStartTime = performance.now();
+            document.getElementById('frameDisplay').innerText = 'Testing: Left Hand';
+        }
+
+        function testFingers() {
+            resetPose();
+            currentTest = 'fingers';
+            testStartTime = performance.now();
+            document.getElementById('frameDisplay').innerText = 'Testing: All Fingers';
+        }
+
+        function testHead() {
+            resetPose();
+            currentTest = 'head';
+            testStartTime = performance.now();
+            document.getElementById('frameDisplay').innerText = 'Testing: Head';
+        }
+
+        function startAutoTest() {
+            resetPose();
+            autoTestRunning = true;
+            animationData = null; // Disable JSON playback
+            document.getElementById('frameDisplay').innerText = 'Auto Test Running...';
+        }
+
+        function stopAutoTest() {
+            autoTestRunning = false;
+            currentTest = null;
+            resetPose();
+        }
+
+        // Run individual tests based on currentTest
+        function runIndividualTest(time) {
+            if (!currentTest || !avatarModel) return;
+
+            const t = (time - testStartTime) * 0.001;
+            const cycle = Math.sin(t * 3);
+
+            switch (currentTest) {
+                case 'rightArm':
+                    const ra = avatarModel.getObjectByName('mixamorigRightArm');
+                    const rfa = avatarModel.getObjectByName('mixamorigRightForeArm');
+                    if (ra) {
+                        ra.rotation.z = 0.5 + cycle * 0.8; // Full range motion
+                        ra.rotation.x = cycle * 0.3;
+                    }
+                    if (rfa) rfa.rotation.z = cycle * 0.5;
+                    break;
+
+                case 'leftArm':
+                    const la = avatarModel.getObjectByName('mixamorigLeftArm');
+                    const lfa = avatarModel.getObjectByName('mixamorigLeftForeArm');
+                    if (la) {
+                        la.rotation.z = -0.5 - cycle * 0.8;
+                        la.rotation.x = cycle * 0.3;
+                    }
+                    if (lfa) lfa.rotation.z = -cycle * 0.5;
+                    break;
+
+                case 'rightHand':
+                    const rh = avatarModel.getObjectByName('mixamorigRightHand');
+                    if (rh) {
+                        rh.rotation.z = cycle * 0.5;
+                        rh.rotation.x = Math.sin(t * 2) * 0.4;
+                        rh.rotation.y = Math.cos(t * 2) * 0.3;
+                    }
+                    break;
+
+                case 'leftHand':
+                    const lh = avatarModel.getObjectByName('mixamorigLeftHand');
+                    if (lh) {
+                        lh.rotation.z = -cycle * 0.5;
+                        lh.rotation.x = Math.sin(t * 2) * 0.4;
+                        lh.rotation.y = -Math.cos(t * 2) * 0.3;
+                    }
+                    break;
+
+                case 'fingers':
+                    const allFingers = [
+                        'mixamorigRightHandThumb1', 'mixamorigRightHandThumb2',
+                        'mixamorigRightHandIndex1', 'mixamorigRightHandIndex2', 'mixamorigRightHandIndex3',
+                        'mixamorigRightHandMiddle1', 'mixamorigRightHandMiddle2', 'mixamorigRightHandMiddle3',
+                        'mixamorigRightHandRing1', 'mixamorigRightHandRing2', 'mixamorigRightHandRing3',
+                        'mixamorigRightHandPinky1', 'mixamorigRightHandPinky2',
+                        'mixamorigLeftHandThumb1', 'mixamorigLeftHandThumb2',
+                        'mixamorigLeftHandIndex1', 'mixamorigLeftHandIndex2', 'mixamorigLeftHandIndex3',
+                        'mixamorigLeftHandMiddle1', 'mixamorigLeftHandMiddle2', 'mixamorigLeftHandMiddle3',
+                        'mixamorigLeftHandRing1', 'mixamorigLeftHandRing2', 'mixamorigLeftHandRing3',
+                        'mixamorigLeftHandPinky1', 'mixamorigLeftHandPinky2'
+                    ];
+                    allFingers.forEach((name, i) => {
+                        const bone = avatarModel.getObjectByName(name);
+                        if (bone) {
+                            const curl = (Math.sin(t * 2 + i * 0.15) + 1) * 0.5;
+                            bone.rotation.z = name.includes('Left') ? -curl : curl;
+                        }
+                    });
+                    break;
+
+                case 'head':
+                    const hd = avatarModel.getObjectByName('mixamorigHead');
+                    if (hd) {
+                        hd.rotation.y = cycle * 0.4; // Look left/right
+                        hd.rotation.x = Math.sin(t * 1.5) * 0.2; // Nod
+                        hd.rotation.z = Math.sin(t * 0.8) * 0.15; // Tilt
+                    }
+                    break;
             }
         }
 
         const boneMap = {
-            "Hips": "Hips",
-            "Spine": "Spine",
-            "Spine1": "Spine1",
-            "Spine2": "Spine2",
-            "Neck": "Neck",
-            "Head": "Head",
-            "RightArm": "RightArm",
-            "RightForeArm": "RightForeArm",
-            "RightHand": "RightHand",
-            "LeftArm": "LeftArm",
-            "LeftForeArm": "LeftForeArm",
-            "LeftHand": "LeftHand",
-            "RightUpLeg": "RightUpLeg",
-            "RightLeg": "RightLeg",
-            "RightFoot": "RightFoot",
-            "LeftUpLeg": "LeftUpLeg",
-            "LeftLeg": "LeftLeg",
-            "LeftFoot": "LeftFoot"
+            "Hips": "mixamorigHips",
+            "Spine": "mixamorigSpine",
+            "Spine1": "mixamorigSpine1",
+            "Spine2": "mixamorigSpine2",
+            "Neck": "mixamorigNeck",
+            "Head": "mixamorigHead",
+            "RightShoulder": "mixamorigRightShoulder",
+            "RightArm": "mixamorigRightArm",
+            "RightForeArm": "mixamorigRightForeArm",
+            "RightHand": "mixamorigRightHand",
+            "LeftShoulder": "mixamorigLeftShoulder",
+            "LeftArm": "mixamorigLeftArm",
+            "LeftForeArm": "mixamorigLeftForeArm",
+            "LeftHand": "mixamorigLeftHand",
+            "RightUpLeg": "mixamorigRightUpLeg",
+            "RightLeg": "mixamorigRightLeg",
+            "RightFoot": "mixamorigRightFoot",
+            "LeftUpLeg": "mixamorigLeftUpLeg",
+            "LeftLeg": "mixamorigLeftLeg",
+            "LeftFoot": "mixamorigLeftFoot",
+            // Fingers - Right
+            "RightHandThumb1": "mixamorigRightHandThumb1",
+            "RightHandThumb2": "mixamorigRightHandThumb2",
+            "RightHandIndex1": "mixamorigRightHandIndex1",
+            "RightHandIndex2": "mixamorigRightHandIndex2",
+            "RightHandMiddle1": "mixamorigRightHandMiddle1",
+            "RightHandMiddle2": "mixamorigRightHandMiddle2",
+            "RightHandRing1": "mixamorigRightHandRing1",
+            "RightHandRing2": "mixamorigRightHandRing2",
+            "RightHandPinky1": "mixamorigRightHandPinky1",
+            "RightHandPinky2": "mixamorigRightHandPinky2",
+            // Fingers - Left
+            "LeftHandThumb1": "mixamorigLeftHandThumb1",
+            "LeftHandThumb2": "mixamorigLeftHandThumb2",
+            "LeftHandIndex1": "mixamorigLeftHandIndex1",
+            "LeftHandIndex2": "mixamorigLeftHandIndex2",
+            "LeftHandMiddle1": "mixamorigLeftHandMiddle1",
+            "LeftHandMiddle2": "mixamorigLeftHandMiddle2",
+            "LeftHandRing1": "mixamorigLeftHandRing1",
+            "LeftHandRing2": "mixamorigLeftHandRing2",
+            "LeftHandPinky1": "mixamorigLeftHandPinky1",
+            "LeftHandPinky2": "mixamorigLeftHandPinky2"
         };
 
+        let debugBoneStart = true;
         function rigRotation(name, rotation) {
             if (!rotation) return;
             const boneName = boneMap[name];
-            const bone = avatarModel.getObjectByName(boneName) || avatarModel.getObjectByName("Mixamo:" + boneName);
+            if (!boneName) return;
+
+            const bone = avatarModel.getObjectByName(boneName);
 
             if (bone) {
-                // Kalidokit gives quaternions or euler. Usually Quaternion.
-                // We need to be careful with coordinate systems.
-                // Kalidokit output is: x, y, z, w
-                const q = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
-                bone.quaternion.slerp(q, 0.5); // Smooth interpolation
+                // Kalidokit gives rotation as {x, y, z} in radians or as quaternion
+                if (rotation.w !== undefined) {
+                    // It's a quaternion
+                    const q = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+                    bone.quaternion.slerp(q, 0.3);
+                } else {
+                    // It's euler angles
+                    const euler = new THREE.Euler(rotation.x, rotation.y, rotation.z, 'XYZ');
+                    bone.quaternion.slerp(new THREE.Quaternion().setFromEuler(euler), 0.3);
+                }
+                if (debugBoneStart) {
+                    showLog("Bone applied: " + name);
+                }
             }
         }
 
@@ -342,6 +736,17 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
+
+        // Expose functions to global scope for button onclick handlers
+        window.resetPose = resetPose;
+        window.testRightArm = testRightArm;
+        window.testLeftArm = testLeftArm;
+        window.testRightHand = testRightHand;
+        window.testLeftHand = testLeftHand;
+        window.testFingers = testFingers;
+        window.testHead = testHead;
+        window.startAutoTest = startAutoTest;
+        window.stopAutoTest = stopAutoTest;
 
         // Start the application
         showLog("Calling init()...");

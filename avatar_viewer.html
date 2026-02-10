@@ -257,29 +257,40 @@
         }
 
         // Convert MediaPipe landmarks to avatar bone rotations using Kalidokit
+        let debugOnce = true;
         function applyPose(frameData) {
             if (!avatarModel || !frameData) return;
-
-            // Stop any embedded animation when applying JSON poses
-            if (mixer) mixer.stopAllAction();
 
             const pose = frameData.pose;
             const leftHand = frameData.left_hand;
             const rightHand = frameData.right_hand;
 
-            if (!pose || pose.length < 23) return;
+            if (!pose || pose.length < 23) {
+                if (debugOnce) { console.log('applyPose: not enough pose landmarks:', pose ? pose.length : 0); debugOnce = false; }
+                return;
+            }
 
             try {
                 // Use Kalidokit to solve pose rotations
-                // Only apply ARM rotations - skip Hips/Spine to prevent avatar from lying down
                 const poseRig = Kalidokit.Pose.solve(pose, pose, {
                     runtime: 'mediapipe',
                     enableLegs: false
                 });
 
+                if (debugOnce) {
+                    console.log('Kalidokit poseRig:', poseRig);
+                    console.log('RightUpperArm:', poseRig?.RightUpperArm);
+                    // Check which bone names exist
+                    ['mixamorigRightArm', 'mixamorigRightForeArm', 'mixamorigRightHand',
+                        'mixamorigLeftArm', 'mixamorigLeftForeArm', 'mixamorigLeftHand'].forEach(name => {
+                            const bone = avatarModel.getObjectByName(name);
+                            console.log(`Bone '${name}':`, bone ? 'FOUND' : 'NOT FOUND');
+                        });
+                    debugOnce = false;
+                }
+
                 if (poseRig) {
-                    // Only arms - DO NOT apply Hips or Spine (causes avatar to lie down)
-                    // Mixamo naming: mixamorigRightArm (not RightUpperArm)
+                    // Only arms - skip Hips/Spine to prevent avatar from lying down
                     rigBone('mixamorigRightArm', poseRig.RightUpperArm);
                     rigBone('mixamorigRightForeArm', poseRig.RightLowerArm);
                     rigBone('mixamorigRightHand', poseRig.RightHand);
@@ -377,10 +388,8 @@
 
             const delta = clock.getDelta();
 
-            if (mixer) mixer.update(delta);
-
             if (isPlaying && animationData && avatarModel) {
-                // JSON pose playback mode
+                // JSON pose playback mode - DO NOT update mixer (it overrides bone rotations)
                 const interval = 1000 / fps;
                 if (time - lastTime > interval) {
                     currentFrame = (currentFrame + 1) % animationData.frames.length;
@@ -388,12 +397,15 @@
                     applyPose(animationData.frames[currentFrame]);
                     lastTime = time;
                 }
-            } else if (avatarModel && autoTestRunning) {
-                // Auto test mode - run automatically
-                runTestAnimation(time);
-            } else if (avatarModel && currentTest) {
-                // Individual test mode
-                runIndividualTest(time);
+            } else {
+                // Only update mixer when NOT playing JSON poses
+                if (mixer) mixer.update(delta);
+
+                if (avatarModel && autoTestRunning) {
+                    runTestAnimation(time);
+                } else if (avatarModel && currentTest) {
+                    runIndividualTest(time);
+                }
             }
 
             renderer.render(scene, camera);
